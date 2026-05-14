@@ -56,7 +56,7 @@ def collect_data(num_samples=2000, save_path="data/dataset.npz"):
         if samples_collected % 50 == 0:
             print(f"Progression : {samples_collected}/{num_samples}")
             # Reset pour diversifier les environnements générés au maximum
-            if samples_collected % 10 == 0:
+            if samples_collected % 1 == 0:
                 obs, _ = env.reset()
             
         if terminated or truncated:

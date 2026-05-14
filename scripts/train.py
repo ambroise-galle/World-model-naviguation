@@ -62,7 +62,18 @@ def train_model(epochs=20, batch_size=32, lr=1e-3, resume=False):
     num_classes = max(t.value for t in TerrainType) + 1
     model = WorldModelAutoEncoder(num_rays=360, embed_dim=128, num_classes=num_classes, map_size=64).to(device)
     
-    criterion = nn.CrossEntropyLoss()
+    # Pondération des classes pour pénaliser fortement (x10) les erreurs sur les obstacles fins
+    class_weights = torch.ones(num_classes, dtype=torch.float32, device=device)
+    hard_obstacles = [
+        TerrainType.TREE_SMALL.value, 
+        TerrainType.TREE_LARGE.value, 
+        TerrainType.WALL.value, 
+        TerrainType.FENCE.value
+    ]
+    for obs_id in hard_obstacles:
+        class_weights[obs_id] = 10.0
+        
+    criterion = nn.CrossEntropyLoss(weight=class_weights)
     optimizer = optim.Adam(model.parameters(), lr=lr)
     
     # Chargement du checkpoint si demandé
