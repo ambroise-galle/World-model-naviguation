@@ -93,57 +93,12 @@ def train_model(epochs=20, batch_size=32, lr=1e-3, resume=False):
     os.makedirs("checkpoints", exist_ok=True)
     torch.save(model.state_dict(), "checkpoints/world_model.pth")
     print("Modèle sauvegardé dans checkpoints/world_model.pth")
-    
-    # Test visuel rapide sur le premier échantillon
-    visualize_prediction(model, dataset, device)
+    # Test visuel
+    print("\nEntraînement terminé !")
+    print("Pour visualiser les prédictions sur une grille interactive, lancez :")
+    print("python3 scripts/show_predictions.py --samples 4")
 
-def visualize_prediction(model, dataset, device):
-    """
-    Crée une image matplotlib comparant la vérité terrain (Ground Truth)
-    avec la prédiction générée par le modèle à partir du Lidar.
-    """
-    model.eval()
-    with torch.no_grad():
-        # Prendre un échantillon au hasard
-        idx = np.random.randint(len(dataset))
-        lidar, true_map = dataset[idx]
-        lidar = lidar.unsqueeze(0).to(device) # Ajouter dimension batch
-        
-        logits = model(lidar)
-        # argmax pour récupérer la classe la plus probable pour chaque pixel
-        pred_map = torch.argmax(logits, dim=1).squeeze(0).cpu().numpy()
-        true_map = true_map.numpy()
-        
-        fig, axes = plt.subplots(1, 3, figsize=(15, 5))
-        
-        # 1. Visualisation du Lidar en 2D (Vue de dessus)
-        lidar_data = lidar.squeeze(0).cpu().numpy() * 10.0 # Denormalisation
-        angles = np.linspace(0, 2 * np.pi, len(lidar_data), endpoint=False)
-        # x = sin(angle), y = cos(angle) pour que l'index 0 (l'avant) pointe vers le haut
-        x_pts = lidar_data * np.sin(angles)
-        y_pts = lidar_data * np.cos(angles)
-        
-        axes[0].scatter(x_pts, y_pts, c=lidar_data, cmap='viridis', s=10)
-        axes[0].plot(0, 0, 'r^', markersize=10) # Le robot au centre
-        axes[0].set_xlim(-10, 10)
-        axes[0].set_ylim(-10, 10)
-        axes[0].set_title("Input: Scan Lidar 1D")
-        axes[0].set_aspect('equal')
-        axes[0].axis('off')
-        
-        # 2. Ground Truth
-        axes[1].imshow(true_map, cmap='nipy_spectral', vmin=0, vmax=10)
-        axes[1].set_title("Ground Truth (Carte Locale)")
-        axes[1].axis('off')
-        
-        # 3. Prédiction
-        axes[2].imshow(pred_map, cmap='nipy_spectral', vmin=0, vmax=10)
-        axes[2].set_title("Output: Prédiction de l'IA")
-        axes[2].axis('off')
-        
-        os.makedirs("data", exist_ok=True)
-        plt.savefig("data/prediction_example.png")
-        print("Image de comparaison (GT vs Pred) sauvegardée dans data/prediction_example.png")
+
 
 if __name__ == "__main__":
     import argparse
