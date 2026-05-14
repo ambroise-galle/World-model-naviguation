@@ -67,15 +67,20 @@ def show_predictions(num_samples=4):
             ax_gt = axes[i, 1] if num_samples > 1 else axes[1]
             ax_pred = axes[i, 2] if num_samples > 1 else axes[2]
             
-            # 1. Plot Lidar
+            # 1. Plot Lidar (Échelle et orientation alignées sur la carte 64x64)
             angles = np.linspace(0, 2 * np.pi, len(lidar_data), endpoint=False)
-            x_pts = lidar_data * np.sin(angles)
-            y_pts = lidar_data * np.cos(angles)
+            x_m = lidar_data * np.sin(angles)
+            y_m = lidar_data * np.cos(angles)
             
-            ax_lidar.scatter(x_pts, y_pts, c=lidar_data, cmap='viridis', s=10)
-            ax_lidar.plot(0, 0, 'r^', markersize=10) # Position du robot
-            ax_lidar.set_xlim(-10, 10)
-            ax_lidar.set_ylim(-10, 10)
+            # Conversion des mètres vers les pixels (résolution de 0.1m, centre à 32,32)
+            resolution = 0.1
+            x_px = 32 + (x_m / resolution)
+            y_px = 32 - (y_m / resolution) # - car l'avant (y positif) est le haut de l'image (y=0)
+            
+            ax_lidar.scatter(x_px, y_px, c=lidar_data, cmap='viridis', s=10)
+            ax_lidar.plot(32, 32, 'r^', markersize=10) # Position du robot au centre pixel
+            ax_lidar.set_xlim(0, 64)
+            ax_lidar.set_ylim(64, 0) # On inverse l'axe Y pour correspondre à l'orientation de imshow
             ax_lidar.set_aspect('equal')
             ax_lidar.axis('off')
             
