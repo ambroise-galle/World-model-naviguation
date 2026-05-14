@@ -147,11 +147,19 @@ class Map:
         if valid_max_x > valid_min_x and valid_max_y > valid_min_y:
             sub_grid[sub_min_x:sub_max_x, sub_min_y:sub_max_y] = self.grid[valid_min_x:valid_max_x, valid_min_y:valid_max_y]
             
-        # Rotation de la grille
-        angle_deg = math.degrees(theta)
+        # Transposer la grille pour que X soit l'axe horizontal (colonnes) et Y l'axe vertical (lignes) 
+        # Cela correspond au système de coordonnées visuel utilisé par matplotlib.imshow
+        sub_grid = sub_grid.T
         
-        # On tourne de -angle_deg pour annuler la rotation du robot, et -90 pour aligner l'avant vers le haut
-        rotated_grid = ndimage.rotate(sub_grid, -angle_deg - 90, reshape=False, order=0, mode='constant', cval=TerrainType.WALL.value)
+        # Calcul de l'angle de rotation
+        # theta est l'angle du robot (0 = vers la droite, 90 = vers le bas).
+        # On veut que le robot pointe vers le haut de l'image (-Y).
+        # Dans ndimage.rotate sur une matrice (Y,X), un angle positif tourne de X vers Y (horaire).
+        # Pour ramener theta vers le haut (-90 degrés ou -pi/2), la formule est -theta - 90.
+        angle_deg = -math.degrees(theta) - 90
+        
+        # Rotation
+        rotated_grid = ndimage.rotate(sub_grid, angle_deg, reshape=False, order=0, mode='constant', cval=TerrainType.WALL.value)
         
         # Découpe finale de la taille demandée
         start_idx = (large_size - size_px) // 2
