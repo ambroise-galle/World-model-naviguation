@@ -46,8 +46,16 @@ def train_model(epochs=20, batch_size=32, lr=1e-3, resume=False):
         return
         
     dataset = LidarMapDataset(dataset_path)
-    dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=True)
-    print(f"Dataset chargé avec {len(dataset)} échantillons.")
+    
+    # Séparation 95% Train / 5% Validation
+    val_size = max(1, int(len(dataset) * 0.05))
+    train_size = len(dataset) - val_size
+    train_dataset, val_dataset = torch.utils.data.random_split(dataset, [train_size, val_size])
+    
+    train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
+    val_loader = DataLoader(val_dataset, batch_size=batch_size, shuffle=False)
+    
+    print(f"Dataset chargé : {train_size} entraînement, {val_size} validation.")
     
     # Modèle
     # num_classes correspond au nombre maximum d'identifiants de TerrainType
@@ -69,7 +77,7 @@ def train_model(epochs=20, batch_size=32, lr=1e-3, resume=False):
         model.train()
         total_loss = 0.0
         
-        for batch_idx, (lidar, true_map) in enumerate(dataloader):
+        for batch_idx, (lidar, true_map) in enumerate(train_loader):
             lidar, true_map = lidar.to(device), true_map.to(device)
             
             optimizer.zero_grad()
@@ -86,8 +94,20 @@ def train_model(epochs=20, batch_size=32, lr=1e-3, resume=False):
             
             total_loss += loss.item()
             
-        avg_loss = total_loss / len(dataloader)
-        print(f"Epoch [{epoch+1}/{epochs}] - Loss: {avg_loss:.4f}")
+        # Validation
+        model.eval()
+        val_loss = 0.0
+        with torch.no_grad():
+            for lidar, true_map in val_loader:
+                lidar, true_map = lidar.to(device), true_map.to(device)
+                map_logits = model(lidar)
+                loss = criterion(map_logits, true_map)
+                val_loss += loss.item()
+                
+        avg_train_loss = total_loss / len(train_loader)
+        avg_val_loss = val_loss / len(val_loader) if len(val_loader) > 0 else 0.0
+        
+        print(f"Epoch [{epoch+1}/{epochs}] - Train Loss: {avg_train_loss:.4f} | Val Loss: {avg_val_loss:.4f}")
         
     # Sauvegarde
     os.makedirs("checkpoints", exist_ok=True)
