@@ -72,4 +72,9 @@ def collect_data(num_samples=2000, save_path="data/dataset.npz"):
     print(f"Dataset sauvegardé avec succès dans : {os.path.abspath(save_path)}")
 
 if __name__ == "__main__":
-    collect_data(2000, "data/dataset.npz")
+    import argparse
+    parser = argparse.ArgumentParser(description="Collecte de données pour l'Auto-Encodeur")
+    parser.add_argument("--samples", type=int, default=2000, help="Nombre d'échantillons à collecter")
+    args = parser.parse_args()
+    
+    collect_data(args.samples, "data/dataset.npz")
