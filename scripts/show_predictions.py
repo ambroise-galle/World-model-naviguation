@@ -8,8 +8,9 @@ import matplotlib.pyplot as plt
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from models.world_model import WorldModelAutoEncoder
-from core.terrain import TerrainType
+from core.terrain import TerrainType, TERRAIN_PROPERTIES
 from scripts.train import LidarMapDataset
+from matplotlib.colors import ListedColormap
 
 def show_predictions(num_samples=4):
     """
@@ -44,6 +45,11 @@ def show_predictions(num_samples=4):
         print(f"Attention : Modèle non trouvé dans {checkpoint_path}. Affichage avec un modèle non entraîné.")
         
     model.eval()
+    
+    # Création de la colormap personnalisée basée sur TERRAIN_PROPERTIES
+    terrain_colors = [TERRAIN_PROPERTIES[TerrainType(i)]["color"] for i in range(len(TerrainType))]
+    terrain_colors = [(r/255.0, g/255.0, b/255.0) for r, g, b in terrain_colors]
+    terrain_cmap = ListedColormap(terrain_colors)
     
     # Création de la grille (num_samples lignes, 3 colonnes)
     fig, axes = plt.subplots(num_samples, 3, figsize=(12, 4 * num_samples))
@@ -91,11 +97,11 @@ def show_predictions(num_samples=4):
                 ax_pred.set_title("Output: Prédiction de l'IA")
                 
             # 2. Plot Ground Truth
-            ax_gt.imshow(true_map, cmap='nipy_spectral', vmin=0, vmax=10)
+            ax_gt.imshow(true_map, cmap=terrain_cmap, vmin=0, vmax=len(TerrainType)-1, interpolation='nearest')
             ax_gt.axis('off')
             
             # 3. Plot Prédiction
-            ax_pred.imshow(pred_map, cmap='nipy_spectral', vmin=0, vmax=10)
+            ax_pred.imshow(pred_map, cmap=terrain_cmap, vmin=0, vmax=len(TerrainType)-1, interpolation='nearest')
             ax_pred.axis('off')
             
     plt.tight_layout()
