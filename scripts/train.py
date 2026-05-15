@@ -84,45 +84,49 @@ def train_model(epochs=20, batch_size=32, lr=1e-3, resume=False):
     
     # Training Loop
     print("Début de l'entraînement...")
+    train_iter = iter(train_loader)
+    
     for epoch in range(epochs):
         model.train()
-        total_loss = 0.0
         
-        for batch_idx, (lidar, true_map) in enumerate(train_loader):
-            lidar, true_map = lidar.to(device), true_map.to(device)
+        # On récupère le prochain batch. Si on a fait le tour du dataset, on réinitialise l'itérateur
+        try:
+            lidar, true_map = next(train_iter)
+        except StopIteration:
+            train_iter = iter(train_loader)
+            lidar, true_map = next(train_iter)
             
-            optimizer.zero_grad()
-            
-            # Forward pass
-            map_logits = model(lidar)
-            
-            # Loss computation
-            loss = criterion(map_logits, true_map)
-            
-            # Backward pass
-            loss.backward()
-            optimizer.step()
-            
-            total_loss += loss.item()
-            
-            # Affichage de la progression de la descente de gradient stochastique (SGD)
-            if (batch_idx + 1) % 10 == 0:
-                print(f"  SGD Step [{batch_idx+1}/{len(train_loader)}] - Batch Loss: {loss.item():.4f}")
-            
-        # Validation
-        model.eval()
-        val_loss = 0.0
-        with torch.no_grad():
-            for lidar, true_map in val_loader:
-                lidar, true_map = lidar.to(device), true_map.to(device)
-                map_logits = model(lidar)
-                loss = criterion(map_logits, true_map)
-                val_loss += loss.item()
-                
-        avg_train_loss = total_loss / len(train_loader)
-        avg_val_loss = val_loss / len(val_loader) if len(val_loader) > 0 else 0.0
+        lidar, true_map = lidar.to(device), true_map.to(device)
         
-        print(f"Epoch [{epoch+1}/{epochs}] - Train Loss: {avg_train_loss:.4f} | Val Loss: {avg_val_loss:.4f}")
+        optimizer.zero_grad()
+        
+        # Forward pass
+        map_logits = model(lidar)
+        
+        # Loss computation
+        loss = criterion(map_logits, true_map)
+        
+        # Backward pass
+        loss.backward()
+        optimizer.step()
+        
+        train_loss = loss.item()
+        
+        # Validation (uniquement tous les 10 epochs pour ne pas ralentir)
+        if (epoch + 1) % 10 == 0 or epoch == epochs - 1:
+            model.eval()
+            val_loss = 0.0
+            with torch.no_grad():
+                for v_lidar, v_true_map in val_loader:
+                    v_lidar, v_true_map = v_lidar.to(device), v_true_map.to(device)
+                    v_map_logits = model(v_lidar)
+                    v_loss = criterion(v_map_logits, v_true_map)
+                    val_loss += v_loss.item()
+                    
+            avg_val_loss = val_loss / len(val_loader) if len(val_loader) > 0 else 0.0
+            print(f"Step [{epoch+1}/{epochs}] - Train Loss: {train_loss:.4f} | Val Loss: {avg_val_loss:.4f}")
+        else:
+            print(f"Step [{epoch+1}/{epochs}] - Train Loss: {train_loss:.4f}")
         
     # Sauvegarde
     os.makedirs("checkpoints", exist_ok=True)
