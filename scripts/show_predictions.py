@@ -33,7 +33,7 @@ def show_predictions(num_samples=4):
     dataset = LidarMapDataset(dataset_path)
     
     num_classes = max(t.value for t in TerrainType) + 1
-    model = WorldModelAutoEncoder(num_rays=360, embed_dim=128, num_classes=num_classes, map_size=64).to(device)
+    model = WorldModelAutoEncoder(num_rays=360, embed_dim=256, num_classes=num_classes, map_size=64).to(device)
     
     checkpoint_path = "checkpoints/world_model.pth"
     if os.path.exists(checkpoint_path):

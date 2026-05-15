@@ -60,7 +60,7 @@ def train_model(epochs=20, batch_size=32, lr=1e-3, resume=False):
     # Modèle
     # num_classes correspond au nombre maximum d'identifiants de TerrainType
     num_classes = max(t.value for t in TerrainType) + 1
-    model = WorldModelAutoEncoder(num_rays=360, embed_dim=128, num_classes=num_classes, map_size=64).to(device)
+    model = WorldModelAutoEncoder(num_rays=360, embed_dim=256, num_classes=num_classes, map_size=64).to(device)
     
     # Pondération des classes pour pénaliser fortement (x10) les erreurs sur les obstacles fins
     class_weights = torch.ones(num_classes, dtype=torch.float32, device=device)
