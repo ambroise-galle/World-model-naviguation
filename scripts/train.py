@@ -71,7 +71,7 @@ def train_model(epochs=20, batch_size=32, lr=1e-3, resume=False):
         TerrainType.FENCE.value
     ]
     for obs_id in hard_obstacles:
-        class_weights[obs_id] = 10.0
+        class_weights[obs_id] = 7.0
         
     criterion = nn.CrossEntropyLoss(weight=class_weights)
     optimizer = optim.Adam(model.parameters(), lr=lr)
