@@ -154,9 +154,11 @@ class Map:
         # Calcul de l'angle de rotation
         # theta est l'angle du robot (0 = vers la droite, 90 = vers le bas).
         # On veut que le robot pointe vers le haut de l'image (-Y).
-        # Dans ndimage.rotate sur une matrice (Y,X), un angle positif tourne de X vers Y (horaire).
-        # Pour ramener theta vers le haut (-90 degrés ou -pi/2), la formule est -theta - 90.
-        angle_deg = -math.degrees(theta) - 90
+        # Dans ndimage.rotate sur une matrice (Y,X), un angle positif tourne dans le sens anti-horaire (CCW).
+        # Pour ramener "droite" (0) vers "haut" (-90), il faut tourner de +90.
+        # Pour ramener "bas" (90) vers "haut" (-90), il faut tourner de +180.
+        # La formule correcte est donc : theta + 90.
+        angle_deg = math.degrees(theta) + 90
         
         # Rotation
         rotated_grid = ndimage.rotate(sub_grid, angle_deg, reshape=False, order=0, mode='constant', cval=TerrainType.WALL.value)
