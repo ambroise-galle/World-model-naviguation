@@ -51,8 +51,8 @@ def show_predictions(num_samples=4):
     terrain_colors = [(r/255.0, g/255.0, b/255.0) for r, g, b in terrain_colors]
     terrain_cmap = ListedColormap(terrain_colors)
     
-    # Création de la grille (num_samples lignes, 3 colonnes)
-    fig, axes = plt.subplots(num_samples, 3, figsize=(12, 4 * num_samples))
+    # Création de la grille (num_samples lignes, 2 colonnes)
+    fig, axes = plt.subplots(num_samples, 2, figsize=(9, 4 * num_samples))
     
     with torch.no_grad():
         for i in range(num_samples):
@@ -68,37 +68,31 @@ def show_predictions(num_samples=4):
             lidar_data = lidar.numpy() * 10.0 # Dénormalisation
             true_map = true_map.numpy()
             
-            # Gestion du cas où num_samples == 1 (axes est un tableau 1D)
-            ax_lidar = axes[i, 0] if num_samples > 1 else axes[0]
-            ax_gt = axes[i, 1] if num_samples > 1 else axes[1]
-            ax_pred = axes[i, 2] if num_samples > 1 else axes[2]
+            # Gestion du cas où num_samples == 1
+            ax_gt = axes[i, 0] if num_samples > 1 else axes[0]
+            ax_pred = axes[i, 1] if num_samples > 1 else axes[1]
             
-            # 1. Plot Lidar (Échelle et orientation alignées sur la carte 64x64)
+            # Titres uniquement sur la première ligne
+            if i == 0:
+                ax_gt.set_title("Input Lidar + Ground Truth")
+                ax_pred.set_title("Output: Prédiction de l'IA")
+                
+            # 1. Plot Ground Truth
+            ax_gt.imshow(true_map, cmap=terrain_cmap, vmin=0, vmax=len(TerrainType)-1, interpolation='nearest')
+            ax_gt.axis('off')
+            
+            # 2. Overlay Lidar sur la Ground Truth
             angles = np.linspace(0, 2 * np.pi, len(lidar_data), endpoint=False)
             x_m = lidar_data * np.sin(angles)
             y_m = lidar_data * np.cos(angles)
             
-            # Conversion des mètres vers les pixels (résolution de 0.1m, centre à 32,32)
             resolution = 0.1
             x_px = 32 + (x_m / resolution)
-            y_px = 32 - (y_m / resolution) # - car l'avant (y positif) est le haut de l'image (y=0)
+            y_px = 32 - (y_m / resolution)
             
-            ax_lidar.scatter(x_px, y_px, c=lidar_data, cmap='viridis', s=10)
-            ax_lidar.plot(32, 32, 'r^', markersize=10) # Position du robot au centre pixel
-            ax_lidar.set_xlim(0, 64)
-            ax_lidar.set_ylim(64, 0) # On inverse l'axe Y pour correspondre à l'orientation de imshow
-            ax_lidar.set_aspect('equal')
-            ax_lidar.axis('off')
-            
-            # Titres uniquement sur la première ligne
-            if i == 0:
-                ax_lidar.set_title("Input: Scan Lidar 1D")
-                ax_gt.set_title("Ground Truth (Carte Locale)")
-                ax_pred.set_title("Output: Prédiction de l'IA")
-                
-            # 2. Plot Ground Truth
-            ax_gt.imshow(true_map, cmap=terrain_cmap, vmin=0, vmax=len(TerrainType)-1, interpolation='nearest')
-            ax_gt.axis('off')
+            # Points blancs avec léger contour noir pour être visible sur n'importe quelle couleur
+            ax_gt.scatter(x_px, y_px, color='white', edgecolor='black', linewidth=0.5, s=15, alpha=0.8)
+            ax_gt.plot(32, 32, 'r^', markersize=10) # Position du robot
             
             # 3. Plot Prédiction
             ax_pred.imshow(pred_map, cmap=terrain_cmap, vmin=0, vmax=len(TerrainType)-1, interpolation='nearest')

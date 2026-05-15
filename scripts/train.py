@@ -71,7 +71,7 @@ def train_model(epochs=20, batch_size=32, lr=1e-3, resume=False):
         TerrainType.FENCE.value
     ]
     for obs_id in hard_obstacles:
-        class_weights[obs_id] = 10.0
+        class_weights[obs_id] = 5.0
         
     criterion = nn.CrossEntropyLoss(weight=class_weights)
     optimizer = optim.Adam(model.parameters(), lr=lr)
@@ -105,6 +105,10 @@ def train_model(epochs=20, batch_size=32, lr=1e-3, resume=False):
             
             total_loss += loss.item()
             
+            # Affichage de la progression de la descente de gradient stochastique (SGD)
+            if (batch_idx + 1) % 10 == 0:
+                print(f"  SGD Step [{batch_idx+1}/{len(train_loader)}] - Batch Loss: {loss.item():.4f}")
+            
         # Validation
         model.eval()
         val_loss = 0.0
@@ -135,7 +139,8 @@ if __name__ == "__main__":
     import argparse
     parser = argparse.ArgumentParser(description="Entraînement de l'Auto-Encodeur Lidar")
     parser.add_argument("--epochs", type=int, default=20, help="Nombre d'epochs à entraîner")
+    parser.add_argument("--batch-size", type=int, default=32, help="Taille des mini-batchs (SGD)")
     parser.add_argument("--resume", action="store_true", help="Reprendre depuis le dernier checkpoint")
     args = parser.parse_args()
     
-    train_model(epochs=args.epochs, resume=args.resume)
+    train_model(epochs=args.epochs, batch_size=args.batch_size, resume=args.resume)
