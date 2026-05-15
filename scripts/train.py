@@ -1,3 +1,4 @@
+from asyncio import base_futures
 import os
 import sys
 import numpy as np
@@ -52,15 +53,16 @@ def train_model(epochs=20, batch_size=32, lr=1e-3, resume=False):
     train_size = len(dataset) - val_size
     train_dataset, val_dataset = torch.utils.data.random_split(dataset, [train_size, val_size])
     
-    train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
-    val_loader = DataLoader(val_dataset, batch_size=batch_size, shuffle=False)
+    # Batch Gradient Descent : le batch correspond à l'intégralité du dataset
+    train_loader = DataLoader(train_dataset, batch_size=len(train_dataset), shuffle=True)
+    val_loader = DataLoader(val_dataset, batch_size=len(val_dataset), shuffle=False)
     
     print(f"Dataset chargé : {train_size} entraînement, {val_size} validation.")
     
     # Modèle
     # num_classes correspond au nombre maximum d'identifiants de TerrainType
     num_classes = max(t.value for t in TerrainType) + 1
-    model = WorldModelAutoEncoder(num_rays=360, embed_dim=128, num_classes=num_classes, map_size=64).to(device)
+    model = WorldModelAutoEncoder(num_rays=360, embed_dim=256, num_classes=num_classes, map_size=64).to(device)
     
     # Pondération des classes pour pénaliser fortement (x10) les erreurs sur les obstacles fins
     class_weights = torch.ones(num_classes, dtype=torch.float32, device=device)
@@ -84,18 +86,12 @@ def train_model(epochs=20, batch_size=32, lr=1e-3, resume=False):
     
     # Training Loop
     print("Début de l'entraînement...")
-    train_iter = iter(train_loader)
     
     for epoch in range(epochs):
         model.train()
         
-        # On récupère le prochain batch. Si on a fait le tour du dataset, on réinitialise l'itérateur
-        try:
-            lidar, true_map = next(train_iter)
-        except StopIteration:
-            train_iter = iter(train_loader)
-            lidar, true_map = next(train_iter)
-            
+        # Le DataLoader ne contient qu'un seul gros batch (tout le dataset)
+        lidar, true_map = next(iter(train_loader))
         lidar, true_map = lidar.to(device), true_map.to(device)
         
         optimizer.zero_grad()
@@ -112,21 +108,19 @@ def train_model(epochs=20, batch_size=32, lr=1e-3, resume=False):
         
         train_loss = loss.item()
         
-        # Validation (uniquement tous les 10 epochs pour ne pas ralentir)
+        # Validation
         if (epoch + 1) % 10 == 0 or epoch == epochs - 1:
             model.eval()
-            val_loss = 0.0
             with torch.no_grad():
-                for v_lidar, v_true_map in val_loader:
-                    v_lidar, v_true_map = v_lidar.to(device), v_true_map.to(device)
-                    v_map_logits = model(v_lidar)
-                    v_loss = criterion(v_map_logits, v_true_map)
-                    val_loss += v_loss.item()
+                v_lidar, v_true_map = next(iter(val_loader))
+                v_lidar, v_true_map = v_lidar.to(device), v_true_map.to(device)
+                v_map_logits = model(v_lidar)
+                v_loss = criterion(v_map_logits, v_true_map)
+                val_loss = v_loss.item()
                     
-            avg_val_loss = val_loss / len(val_loader) if len(val_loader) > 0 else 0.0
-            print(f"Step [{epoch+1}/{epochs}] - Train Loss: {train_loss:.4f} | Val Loss: {avg_val_loss:.4f}")
+            print(f"Epoch [{epoch+1}/{epochs}] - Train Loss: {train_loss:.4f} | Val Loss: {val_loss:.4f}")
         else:
-            print(f"Step [{epoch+1}/{epochs}] - Train Loss: {train_loss:.4f}")
+            print(f"Epoch [{epoch+1}/{epochs}] - Train Loss: {train_loss:.4f}")
         
     # Sauvegarde
     os.makedirs("checkpoints", exist_ok=True)
