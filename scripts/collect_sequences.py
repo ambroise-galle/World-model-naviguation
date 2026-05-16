@@ -71,6 +71,7 @@ def collect_sequences(num_episodes=1000, max_steps=300):
             # Convertir en tableaux numpy
             all_z.append(np.array(episode_z))
             all_actions.append(np.array(episode_actions))
+            print(f"Episode {episode+1}/{num_episodes} terminé")
             
     # 3. Sauvegarde
     os.makedirs("data", exist_ok=True)
