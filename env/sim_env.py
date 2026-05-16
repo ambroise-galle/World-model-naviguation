@@ -1,6 +1,7 @@
 import gymnasium as gym
 from gymnasium import spaces
 import numpy as np
+import pygame
 from core.map import Map
 from core.robot import Robot
 from core.lidar import Lidar
