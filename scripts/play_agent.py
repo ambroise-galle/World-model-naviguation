@@ -33,6 +33,7 @@ def play_agent(episodes=5):
         return
         
     # 2. Charger les modèles V et M
+    print("Chargement des modèles V et M...")
     num_classes = max(t.value for t in TerrainType) + 1
     v_model = WorldModelAutoEncoder(embed_dim=256, num_classes=num_classes).to(device)
     m_model = MemoryRNN(z_dim=256, action_dim=2, hidden_size=256).to(device)
