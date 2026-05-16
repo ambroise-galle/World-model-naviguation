@@ -6,6 +6,7 @@ import argparse
 
 from env.sim_env import WorldModelEnv
 from models.world_model import WorldModelAutoEncoder
+from core.terrain import TerrainType
 
 def collect_sequences(num_episodes=1000, max_steps=300):
     device = torch.device("mps" if torch.backends.mps.is_available() else "cuda" if torch.cuda.is_available() else "cpu")
@@ -14,7 +15,8 @@ def collect_sequences(num_episodes=1000, max_steps=300):
     # 1. Charger l'Autoencodeur gelé (V)
     # L'autoencodeur doit déjà avoir été entraîné
     embed_dim = 256
-    model_v = WorldModelAutoEncoder(num_rays=360, embed_dim=embed_dim).to(device)
+    num_classes = max(t.value for t in TerrainType) + 1
+    model_v = WorldModelAutoEncoder(num_rays=360, embed_dim=embed_dim, num_classes=num_classes).to(device)
     
     checkpoint_path = "checkpoints/world_model.pth"
     if not os.path.exists(checkpoint_path):

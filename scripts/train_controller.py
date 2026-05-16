@@ -8,6 +8,7 @@ import argparse
 from env.sim_env import WorldModelEnv
 from models.world_model import WorldModelAutoEncoder
 from models.mdn_rnn import MemoryRNN
+from core.terrain import TerrainType
 
 try:
     from stable_baselines3 import PPO
@@ -82,7 +83,8 @@ def train_controller(timesteps=100_000):
         return
         
     # Charger les modèles V et M
-    v_model = WorldModelAutoEncoder(embed_dim=256).to(device)
+    num_classes = max(t.value for t in TerrainType) + 1
+    v_model = WorldModelAutoEncoder(embed_dim=256, num_classes=num_classes).to(device)
     m_model = MemoryRNN(z_dim=256, action_dim=2, hidden_size=256).to(device)
     
     v_model.load_state_dict(torch.load("checkpoints/world_model.pth", map_location=device))
