@@ -6,8 +6,6 @@ from core.robot import Robot
 from core.lidar import Lidar
 from core.terrain import TerrainType
 
-import pygame
-
 class WorldModelEnv(gym.Env):
     metadata = {"render_modes": ["human", "rgb_array"], "render_fps": 30}
 
