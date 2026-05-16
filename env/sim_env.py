@@ -4,6 +4,8 @@ import numpy as np
 from core.map import Map
 from core.robot import Robot
 from core.lidar import Lidar
+from core.terrain import TerrainType
+
 import pygame
 
 class WorldModelEnv(gym.Env):
@@ -49,8 +51,6 @@ class WorldModelEnv(gym.Env):
         self.robot = Robot(init_x, init_y, init_theta, self.map_env)
         self.lidar = Lidar(self.map_env, self.num_rays, self.max_range)
         
-        # Placer le but (aléatoirement sur de l'herbe, à plus de 3m du robot)
-        from core.terrain import TerrainType
         # Placer le but (aléatoirement sur de l'herbe, à plus de 3m du robot)
         # On limite le nombre d'essais pour éviter toute boucle infinie
         for _ in range(100):
