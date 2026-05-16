@@ -6,34 +6,36 @@ from core.robot import Robot
 from core.lidar import Lidar
 from core.terrain import TerrainType
 
+import pygame
+
 class WorldModelEnv(gym.Env):
     metadata = {"render_modes": ["human", "rgb_array"], "render_fps": 30}
 
     def __init__(self, render_mode=None, map_width=200, map_height=200, resolution=0.1, num_rays=360, max_range=10.0):
-        super().__init__()
         print(1)
+        super().__init__()
+        
         self.map_width = map_width
         self.map_height = map_height
         self.resolution = resolution
         self.num_rays = num_rays
         self.max_range = max_range
-        print(2)
+        
         # Action space: [left_wheel_torque, right_wheel_torque] in [-1, 1]
         self.action_space = spaces.Box(low=-1.0, high=1.0, shape=(2,), dtype=np.float32)
-        print(3)
+        
         obs_dict = {
             "lidar": spaces.Box(low=0.0, high=max_range, shape=(num_rays,), dtype=np.float32),
             "state": spaces.Box(low=-np.inf, high=np.inf, shape=(5,), dtype=np.float32), # x, y, theta, v, omega
             "goal": spaces.Box(low=-np.inf, high=np.inf, shape=(2,), dtype=np.float32) # distance, angle_diff
         }
         self.observation_space = spaces.Dict(obs_dict)
-        print(4)
+        
         self.render_mode = render_mode
         self.viewer = None
         self.dt = 1.0 / self.metadata["render_fps"]
-        print(5)
+        
         self.reset()
-        print(6)
         
     def reset(self, seed=None, options=None):
         super().reset(seed=seed)
@@ -70,7 +72,6 @@ class WorldModelEnv(gym.Env):
             self.viewer.goal_x = getattr(self, 'goal_x', 0.0)
             self.viewer.goal_y = getattr(self, 'goal_y', 0.0)
             self.viewer.build_map_surface()
-            import pygame
             self.viewer.lidar_surface = pygame.Surface((self.viewer.map_surface.get_width(), self.viewer.map_surface.get_height()), pygame.SRCALPHA)
             self.viewer.lidar_surface.fill((0, 0, 0, 0))
         
