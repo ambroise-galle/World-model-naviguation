@@ -5,12 +5,13 @@ from core.map import Map
 from core.robot import Robot
 from core.lidar import Lidar
 from core.terrain import TerrainType
+print("[sim_env] Module loaded", flush=True)
 
 class WorldModelEnv(gym.Env):
     metadata = {"render_modes": ["human", "rgb_array"], "render_fps": 30}
 
     def __init__(self, render_mode=None, map_width=200, map_height=200, resolution=0.1, num_rays=360, max_range=10.0):
-        print(1)
+        print("[sim_env] __init__ START", flush=True)
         super().__init__()
         
         self.map_width = map_width
