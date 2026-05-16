@@ -1,6 +1,9 @@
 """
 Script de visualisation pour Google Colab.
-Génère une vidéo MP4 de l'agent et l'affiche dans le notebook.
+Génère une vidéo MP4 de l'agent avec une vue décodée de l'embedding.
+La vidéo montre côte à côte :
+  - À gauche : la vue de simulation (Pygame)
+  - À droite : la carte décodée par l'Auto-Encodeur (ce que le "cerveau" voit)
 """
 import os
 import torch
@@ -11,13 +14,34 @@ from env.sim_env import WorldModelEnv
 from models.world_model import WorldModelAutoEncoder
 from models.mdn_rnn import MemoryRNN
 from scripts.train_controller import WorldModelWrapper
-from core.terrain import TerrainType
+from core.terrain import TerrainType, TERRAIN_PROPERTIES
 
 try:
     from stable_baselines3 import PPO
 except ImportError:
     print("Veuillez installer stable-baselines3 : pip3 install stable-baselines3")
     exit(1)
+
+
+def decode_z_to_rgb(z_tensor, v_model, terrain_colors, device):
+    """
+    Décode un vecteur latent z en carte sémantique RGB.
+    z_tensor : (1, 256)
+    Retourne un tableau numpy (H, W, 3) uint8.
+    """
+    with torch.no_grad():
+        logits = v_model.decoder(z_tensor)          # (1, num_classes, 64, 64)
+        pred_classes = torch.argmax(logits, dim=1)   # (1, 64, 64)
+        pred_map = pred_classes[0].cpu().numpy()      # (64, 64)
+
+    # Convertir les classes en couleurs RGB
+    h, w = pred_map.shape
+    rgb = np.zeros((h, w, 3), dtype=np.uint8)
+    for cls_val, color in terrain_colors.items():
+        mask = pred_map == cls_val
+        rgb[mask] = color
+
+    return rgb
 
 
 def play_agent(episodes=3, max_steps=500, output_path="videos/agent_demo.mp4"):
@@ -44,12 +68,13 @@ def play_agent(episodes=3, max_steps=500, output_path="videos/agent_demo.mp4"):
     v_model.eval()
     m_model.eval()
 
+    # Table de couleurs pour le rendu des classes terrain
+    terrain_colors = {t.value: TERRAIN_PROPERTIES[t]["color"] for t in TerrainType}
+
     # 3. Créer l'environnement en mode rgb_array (pas de fenêtre pygame)
-    #    On force le driver vidéo dummy pour que pygame fonctionne sans écran (Colab)
     os.environ["SDL_VIDEODRIVER"] = "dummy"
     import pygame
     pygame.init()
-    # Créer un écran invisible (nécessaire pour pygame.surfarray)
     pygame.display.set_mode((1, 1))
 
     env = WorldModelEnv(render_mode="rgb_array")
@@ -59,7 +84,7 @@ def play_agent(episodes=3, max_steps=500, output_path="videos/agent_demo.mp4"):
     model = PPO.load(c_path, env=env)
     print("Agent PPO chargé.")
 
-    # 5. Collecter les frames
+    # 5. Collecter les frames composites (simulation + vue décodée)
     all_frames = []
     for ep in range(episodes):
         obs, _ = env.reset()
@@ -74,16 +99,36 @@ def play_agent(episodes=3, max_steps=500, output_path="videos/agent_demo.mp4"):
             done = terminated or truncated
             step += 1
 
-            # Récupérer la frame rendue
-            frame = env.render()
-            if frame is not None:
-                all_frames.append(frame)
+            # -- Frame de simulation --
+            sim_frame = env.render()
+            if sim_frame is None:
+                continue
+
+            # -- Frame décodée (ce que le cerveau "voit") --
+            z_t = env.z_current  # (1, 256), stocké par le WorldModelWrapper
+            decoded_rgb = decode_z_to_rgb(z_t, v_model, terrain_colors, device)
+
+            # Redimensionner la carte décodée (64×64) pour qu'elle ait la même hauteur
+            sim_h, sim_w, _ = sim_frame.shape
+            scale = sim_h / decoded_rgb.shape[0]
+            decoded_size = int(decoded_rgb.shape[0] * scale)
+
+            # Upscale via nearest-neighbor (pas de flou)
+            decoded_big = np.repeat(np.repeat(decoded_rgb, int(scale), axis=0), int(scale), axis=1)
+            # Ajuster la taille exacte si nécessaire
+            decoded_big = decoded_big[:sim_h, :decoded_size, :]
+
+            # Bande de séparation noire
+            separator = np.zeros((sim_h, 4, 3), dtype=np.uint8)
+
+            # Assembler côte à côte : [Simulation | Séparateur | Vue Décodée]
+            composite = np.concatenate([sim_frame, separator, decoded_big], axis=1)
+            all_frames.append(composite)
 
         print(f"Épisode {ep+1}/{episodes} — {step} steps, reward: {total_reward:.1f}")
 
     env.close()
     pygame.quit()
-    # Remettre le driver vidéo normal pour la suite
     if "SDL_VIDEODRIVER" in os.environ:
         del os.environ["SDL_VIDEODRIVER"]
 
@@ -103,7 +148,6 @@ def play_agent(episodes=3, max_steps=500, output_path="videos/agent_demo.mp4"):
             writer.write(cv2.cvtColor(frame, cv2.COLOR_RGB2BGR))
         writer.release()
     except ImportError:
-        # Fallback : imageio si opencv n'est pas dispo
         import imageio
         imageio.mimwrite(output_path, all_frames, fps=30)
 
