@@ -35,31 +35,31 @@ class WorldModelEnv(gym.Env):
         self.reset()
         
     def reset(self, seed=None, options=None):
-        print(1)
         super().reset(seed=seed)
-        print(2)
         
         # Regénérer la carte aléatoire
         self.map_env = Map(self.map_width, self.map_height, self.resolution)
         self.map_env.generate_random()
-        print(3)
         
         # Placer le robot
         init_x = (self.map_width * self.resolution) / 2.0
         init_y = (self.map_height * self.resolution) / 2.0
         init_theta = 0.0
-        print(4)
+        
         self.robot = Robot(init_x, init_y, init_theta, self.map_env)
-        print(5)
         self.lidar = Lidar(self.map_env, self.num_rays, self.max_range)
-        print(6)
-        # Placer le but aléatoirement à plus de 3m du robot (coordonnées polaires)
-        angle = np.random.uniform(0, 2 * np.pi)
-        dist = np.random.uniform(3.0, min(self.map_width, self.map_height) * self.resolution * 0.4)
-        print(7)
-        self.goal_x = init_x + dist * np.cos(angle)
-        self.goal_y = init_y + dist * np.sin(angle)
-        print(8)
+        # Placer le but (aléatoirement sur de l'herbe, à plus de 3m du robot)
+        # On limite le nombre d'essais pour éviter toute boucle infinie
+        for _ in range(100):
+            gx = np.random.uniform(0, self.map_width * self.resolution)
+            gy = np.random.uniform(0, self.map_height * self.resolution)
+            dist_to_center = np.hypot(gx - init_x, gy - init_y)
+            terrain = self.map_env.get_terrain(gx, gy)
+            if terrain in [TerrainType.SHORT_GRASS, TerrainType.MEDIUM_GRASS, TerrainType.TALL_GRASS] and dist_to_center > 3.0:
+                break
+                
+        self.goal_x = gx
+        self.goal_y = gy
         
         # Mise à jour du viewer avec les nouvelles références
         if self.viewer is not None:
