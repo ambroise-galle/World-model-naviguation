@@ -28,7 +28,9 @@ def collect_sequences(num_episodes=1000, max_steps=300):
     model_v.eval() # Figer le modèle
     
     # 2. Initialiser l'Environnement
+    print(">>> About to create WorldModelEnv...", flush=True)
     env = WorldModelEnv(render_mode=None) # Pas d'affichage pour aller plus vite
+    print(">>> WorldModelEnv created!", flush=True)
     # Stockage
     all_z = []
     all_actions = []
