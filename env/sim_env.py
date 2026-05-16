@@ -50,11 +50,13 @@ class WorldModelEnv(gym.Env):
         self.lidar = Lidar(self.map_env, self.num_rays, self.max_range)
         
         # Placer le but (aléatoirement sur de l'herbe, à plus de 3m du robot)
+        from core.terrain import TerrainType
         while True:
             gx = np.random.uniform(0, self.map_width * self.resolution)
             gy = np.random.uniform(0, self.map_height * self.resolution)
             dist_to_center = np.hypot(gx - init_x, gy - init_y)
-            if self.map_env.get_terrain(gx, gy).name == "GRASS" and dist_to_center > 3.0:
+            terrain = self.map_env.get_terrain(gx, gy)
+            if terrain in [TerrainType.SHORT_GRASS, TerrainType.MEDIUM_GRASS, TerrainType.TALL_GRASS] and dist_to_center > 3.0:
                 self.goal_x = gx
                 self.goal_y = gy
                 break
