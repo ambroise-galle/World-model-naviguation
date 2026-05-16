@@ -6,8 +6,6 @@ from core.robot import Robot
 from core.lidar import Lidar
 from core.terrain import TerrainType
 
-import pygame
-
 class WorldModelEnv(gym.Env):
     metadata = {"render_modes": ["human", "rgb_array"], "render_fps": 30}
 
@@ -71,6 +69,7 @@ class WorldModelEnv(gym.Env):
             self.viewer.goal_x = getattr(self, 'goal_x', 0.0)
             self.viewer.goal_y = getattr(self, 'goal_y', 0.0)
             self.viewer.build_map_surface()
+            import pygame
             self.viewer.lidar_surface = pygame.Surface((self.viewer.map_surface.get_width(), self.viewer.map_surface.get_height()), pygame.SRCALPHA)
             self.viewer.lidar_surface.fill((0, 0, 0, 0))
         
