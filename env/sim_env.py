@@ -48,18 +48,11 @@ class WorldModelEnv(gym.Env):
         
         self.robot = Robot(init_x, init_y, init_theta, self.map_env)
         self.lidar = Lidar(self.map_env, self.num_rays, self.max_range)
-        # Placer le but (aléatoirement sur de l'herbe, à plus de 3m du robot)
-        # On limite le nombre d'essais pour éviter toute boucle infinie
-        for _ in range(100):
-            gx = np.random.uniform(0, self.map_width * self.resolution)
-            gy = np.random.uniform(0, self.map_height * self.resolution)
-            dist_to_center = np.hypot(gx - init_x, gy - init_y)
-            terrain = self.map_env.get_terrain(gx, gy)
-            if terrain in [TerrainType.SHORT_GRASS, TerrainType.MEDIUM_GRASS, TerrainType.TALL_GRASS] and dist_to_center > 3.0:
-                break
-                
-        self.goal_x = gx
-        self.goal_y = gy
+        # Placer le but aléatoirement à plus de 3m du robot (coordonnées polaires)
+        angle = np.random.uniform(0, 2 * np.pi)
+        dist = np.random.uniform(3.0, min(self.map_width, self.map_height) * self.resolution * 0.4)
+        self.goal_x = init_x + dist * np.cos(angle)
+        self.goal_y = init_y + dist * np.sin(angle)
         
         # Mise à jour du viewer avec les nouvelles références
         if self.viewer is not None:
