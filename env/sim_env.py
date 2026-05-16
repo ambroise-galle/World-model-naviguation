@@ -51,15 +51,18 @@ class WorldModelEnv(gym.Env):
         
         # Placer le but (aléatoirement sur de l'herbe, à plus de 3m du robot)
         from core.terrain import TerrainType
-        while True:
+        # Placer le but (aléatoirement sur de l'herbe, à plus de 3m du robot)
+        # On limite le nombre d'essais pour éviter toute boucle infinie
+        for _ in range(100):
             gx = np.random.uniform(0, self.map_width * self.resolution)
             gy = np.random.uniform(0, self.map_height * self.resolution)
             dist_to_center = np.hypot(gx - init_x, gy - init_y)
             terrain = self.map_env.get_terrain(gx, gy)
             if terrain in [TerrainType.SHORT_GRASS, TerrainType.MEDIUM_GRASS, TerrainType.TALL_GRASS] and dist_to_center > 3.0:
-                self.goal_x = gx
-                self.goal_y = gy
                 break
+                
+        self.goal_x = gx
+        self.goal_y = gy
         
         # Mise à jour du viewer avec les nouvelles références
         if self.viewer is not None:
