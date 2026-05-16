@@ -23,7 +23,8 @@ class WorldModelEnv(gym.Env):
         
         obs_dict = {
             "lidar": spaces.Box(low=0.0, high=max_range, shape=(num_rays,), dtype=np.float32),
-            "state": spaces.Box(low=-np.inf, high=np.inf, shape=(5,), dtype=np.float32) # x, y, theta, v, omega
+            "state": spaces.Box(low=-np.inf, high=np.inf, shape=(5,), dtype=np.float32), # x, y, theta, v, omega
+            "goal": spaces.Box(low=-np.inf, high=np.inf, shape=(2,), dtype=np.float32) # distance, angle_diff
         }
         self.observation_space = spaces.Dict(obs_dict)
         
@@ -48,11 +49,23 @@ class WorldModelEnv(gym.Env):
         self.robot = Robot(init_x, init_y, init_theta, self.map_env)
         self.lidar = Lidar(self.map_env, self.num_rays, self.max_range)
         
+        # Placer le but (aléatoirement sur de l'herbe, à plus de 3m du robot)
+        while True:
+            gx = np.random.uniform(0, self.map_width * self.resolution)
+            gy = np.random.uniform(0, self.map_height * self.resolution)
+            dist_to_center = np.hypot(gx - init_x, gy - init_y)
+            if self.map_env.get_terrain(gx, gy).name == "GRASS" and dist_to_center > 3.0:
+                self.goal_x = gx
+                self.goal_y = gy
+                break
+        
         # Mise à jour du viewer avec les nouvelles références
         if self.viewer is not None:
             self.viewer.map_env = self.map_env
             self.viewer.robot = self.robot
             self.viewer.lidar = self.lidar
+            self.viewer.goal_x = getattr(self, 'goal_x', 0.0)
+            self.viewer.goal_y = getattr(self, 'goal_y', 0.0)
             self.viewer.build_map_surface()
             self.viewer.lidar_surface = pygame.Surface((self.viewer.map_surface.get_width(), self.viewer.map_surface.get_height()), pygame.SRCALPHA)
             self.viewer.lidar_surface.fill((0, 0, 0, 0))
@@ -68,9 +81,19 @@ class WorldModelEnv(gym.Env):
     def _get_obs(self):
         scan = self.lidar.scan(self.robot.x, self.robot.y, self.robot.theta)
         state = np.array([self.robot.x, self.robot.y, self.robot.theta, self.robot.v, self.robot.omega], dtype=np.float32)
+        
+        dx = self.goal_x - self.robot.x
+        dy = self.goal_y - self.robot.y
+        dist = np.hypot(dx, dy)
+        angle_to_goal = np.arctan2(dy, dx)
+        angle_diff = angle_to_goal - self.robot.theta
+        angle_diff = (angle_diff + np.pi) % (2 * np.pi) - np.pi
+        goal_obs = np.array([dist, angle_diff], dtype=np.float32)
+        
         return {
             "lidar": scan.astype(np.float32),
-            "state": state
+            "state": state,
+            "goal": goal_obs
         }
         
     def step(self, action):
@@ -79,13 +102,23 @@ class WorldModelEnv(gym.Env):
         self.robot.step(action_l, action_r, self.dt)
         
         obs = self._get_obs()
+        dist_to_goal = obs["goal"][0]
         
         # Récompense simpliste pour avancer
-        reward = self.robot.v
+        reward = -0.01 # Pénalité temporelle
         
         terminated = False
         truncated = False
         info = {}
+        
+        # Vérification des conditions de fin
+        if dist_to_goal < 0.5:
+            reward += 10.0
+            terminated = True
+            
+        if getattr(self.robot, 'is_colliding', False):
+            reward -= 5.0
+            terminated = True
         
         if self.render_mode == "human":
             self.render()
@@ -100,6 +133,9 @@ class WorldModelEnv(gym.Env):
             # Importé ici pour éviter de charger Pygame en mode headless (Google Colab)
             from render.viewer import Viewer
             self.viewer = Viewer(self.map_env, self.robot, self.lidar, self.metadata["render_fps"])
+        
+        self.viewer.goal_x = getattr(self, 'goal_x', 0.0)
+        self.viewer.goal_y = getattr(self, 'goal_y', 0.0)
             
         return self.viewer.render(self.render_mode)
         

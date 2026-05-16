@@ -82,6 +82,21 @@ class Viewer:
         map_py = int(-cy * self.ppm + self.height / 2)
         self.screen.blit(self.map_surface, (map_px, map_py))
 
+        # 1.5 Dessiner l'objectif (Goal)
+        if hasattr(self, 'goal_x') and hasattr(self, 'goal_y'):
+            goal_px, goal_py = self._world_to_pixel(self.goal_x, self.goal_y, cx, cy)
+            # Effet de pulsation
+            pulse_radius = 15 + int(5 * np.sin(pygame.time.get_ticks() / 200.0))
+            
+            # Pour la transparence du halo, on a besoin d'une surface temporaire
+            halo_surf = pygame.Surface((pulse_radius*2, pulse_radius*2), pygame.SRCALPHA)
+            pygame.draw.circle(halo_surf, (255, 255, 50, 100), (pulse_radius, pulse_radius), pulse_radius)
+            self.screen.blit(halo_surf, (goal_px - pulse_radius, goal_py - pulse_radius))
+            
+            # Cœur de l'objectif
+            pygame.draw.circle(self.screen, (255, 200, 0), (goal_px, goal_py), 8)
+            pygame.draw.circle(self.screen, (255, 255, 255), (goal_px, goal_py), 4)
+
         # 2. Dessiner l'accumulation LIDAR avec un fondu (fade out)
         # On utilise une valeur plus élevée pour que les points disparaissent vite (decay visible)
         self.lidar_surface.fill((0, 0, 0, 10), special_flags=pygame.BLEND_RGBA_SUB)
