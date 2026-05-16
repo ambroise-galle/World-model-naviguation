@@ -54,6 +54,7 @@ class WorldModelEnv(gym.Env):
         # Placer le but (aléatoirement sur de l'herbe, à plus de 3m du robot)
         # On limite le nombre d'essais pour éviter toute boucle infinie
         for _ in range(100):
+            print("Attemp objectif")
             gx = np.random.uniform(0, self.map_width * self.resolution)
             gy = np.random.uniform(0, self.map_height * self.resolution)
             dist_to_center = np.hypot(gx - init_x, gy - init_y)
