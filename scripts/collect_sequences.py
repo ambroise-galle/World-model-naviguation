@@ -22,13 +22,14 @@ def collect_sequences(num_episodes=1000, max_steps=300):
     if not os.path.exists(checkpoint_path):
         print(f"Erreur : Impossible de trouver {checkpoint_path}. Entraînez d'abord l'auto-encodeur.")
         return
+    print("Modèle chargé")
         
     model_v.load_state_dict(torch.load(checkpoint_path, map_location=device))
     model_v.eval() # Figer le modèle
     
     # 2. Initialiser l'Environnement
     env = WorldModelEnv(render_mode=None) # Pas d'affichage pour aller plus vite
-    
+    print("Environnement chargé")
     # Stockage
     all_z = []
     all_actions = []
