@@ -31,7 +31,10 @@ class WorldModelEnv(gym.Env):
         
         self.render_mode = render_mode
         self.viewer = None
-        self.dt = 1.0 / self.metadata["render_fps"]
+        self.dt = 3.0 / self.metadata["render_fps"]  # 3× faster simulation step
+        self.step_count = 0
+        self.max_steps = 500
+        self._prev_dist = None
         
         self.reset()
         
@@ -74,6 +77,8 @@ class WorldModelEnv(gym.Env):
             self.viewer.lidar_surface.fill((0, 0, 0, 0))
         
         obs = self._get_obs()
+        self._prev_dist = obs["goal"][0]  # initialise pour le shaping
+        self.step_count = 0
         info = {}
         
         if self.render_mode == "human":
@@ -103,25 +108,36 @@ class WorldModelEnv(gym.Env):
         action_l, action_r = action
         
         self.robot.step(action_l, action_r, self.dt)
+        self.step_count += 1
         
         obs = self._get_obs()
         dist_to_goal = obs["goal"][0]
         
-        # Récompense simpliste pour avancer
-        reward = -0.01 # Pénalité temporelle
+        # 1. Dense shaping: reward for reducing distance to goal
+        prev_dist = self._prev_dist if self._prev_dist is not None else dist_to_goal
+        progress = prev_dist - dist_to_goal          # positive = got closer
+        reward = float(5.0 * progress)               # cast to Python float (SB3 requirement)
+        self._prev_dist = dist_to_goal
+        
+        # 2. Small time penalty to discourage standing still
+        reward -= 0.005
         
         terminated = False
         truncated = False
         info = {}
         
-        # Vérification des conditions de fin
+        # 3. Sparse goal bonus
         if dist_to_goal < 0.5:
-            reward += 10.0
+            reward += 20.0
             terminated = True
             
+        # 4. Collision penalty (no termination – let the agent learn to back up)
         if getattr(self.robot, 'is_colliding', False):
-            reward -= 5.0
-            terminated = True
+            reward -= 0.5
+        
+        # 5. Episode truncation
+        if self.step_count >= self.max_steps:
+            truncated = True
         
         if self.render_mode == "human":
             self.render()

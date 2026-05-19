@@ -1,9 +1,17 @@
 import os
+import sys
+
+# Workaround for AMD Radeon RX 6700 XT (gfx1031) on ROCm
+if not os.environ.get("HSA_OVERRIDE_GFX_VERSION"):
+    os.environ["HSA_OVERRIDE_GFX_VERSION"] = "10.3.0"
+
+# Ajouter le dossier parent au path pour les imports locaux
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
 import torch
 import numpy as np
 from tqdm import tqdm
 import argparse
-
 from env.sim_env import WorldModelEnv
 from models.world_model import WorldModelAutoEncoder
 from core.terrain import TerrainType

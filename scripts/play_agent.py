@@ -6,6 +6,15 @@ La vidéo montre côte à côte :
   - À droite : la carte décodée par l'Auto-Encodeur (ce que le "cerveau" voit)
 """
 import os
+import sys
+
+# Ajouter le dossier parent au path pour les imports locaux
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+# Workaround for AMD Radeon RX 6700 XT (gfx1031) on ROCm
+if not os.environ.get("HSA_OVERRIDE_GFX_VERSION"):
+    os.environ["HSA_OVERRIDE_GFX_VERSION"] = "10.3.0"
+
 import torch
 import numpy as np
 import argparse
@@ -18,6 +27,7 @@ from core.terrain import TerrainType, TERRAIN_PROPERTIES
 
 try:
     from stable_baselines3 import PPO
+    from stable_baselines3.common.vec_env import DummyVecEnv, VecNormalize
 except ImportError:
     print("Veuillez installer stable-baselines3 : pip3 install stable-baselines3")
     exit(1)
@@ -80,26 +90,36 @@ def play_agent(episodes=3, max_steps=500, output_path="videos/agent_demo.mp4"):
     env = WorldModelEnv(render_mode="rgb_array")
     env = WorldModelWrapper(env, v_model, m_model, device)
 
+    # Wrap in VecNormalize if stats were saved during training
+    vec_norm_path = "checkpoints/vec_normalize.pkl"
+    vec_env = DummyVecEnv([lambda: env])
+    if os.path.exists(vec_norm_path):
+        vec_env = VecNormalize.load(vec_norm_path, vec_env)
+        vec_env.training = False  # do not update running stats
+        vec_env.norm_reward = False
+        print("Normalisation VecNormalize chargée.")
+
     # 4. Charger PPO
-    model = PPO.load(c_path, env=env)
+    model = PPO.load(c_path, env=vec_env)
     print("Agent PPO chargé.")
 
     # 5. Collecter les frames composites (simulation + vue décodée)
+    # vec_env is used for predict(); raw env is accessed for frames and z_current
     all_frames = []
     for ep in range(episodes):
-        obs, _ = env.reset()
+        obs = vec_env.reset()   # returns np.array (1, 514)
         done = False
         step = 0
         total_reward = 0.0
 
         while not done and step < max_steps:
             action, _ = model.predict(obs, deterministic=True)
-            obs, reward, terminated, truncated, _ = env.step(action)
-            total_reward += reward
-            done = terminated or truncated
+            obs, reward, dones, infos = vec_env.step(action)
+            total_reward += float(reward[0])
+            done = bool(dones[0])
             step += 1
 
-            # -- Frame de simulation --
+            # -- Frame de simulation (from the underlying raw env) --
             sim_frame = env.render()
             if sim_frame is None:
                 continue
@@ -127,7 +147,7 @@ def play_agent(episodes=3, max_steps=500, output_path="videos/agent_demo.mp4"):
 
         print(f"Épisode {ep+1}/{episodes} — {step} steps, reward: {total_reward:.1f}")
 
-    env.close()
+    vec_env.close()
     pygame.quit()
     if "SDL_VIDEODRIVER" in os.environ:
         del os.environ["SDL_VIDEODRIVER"]

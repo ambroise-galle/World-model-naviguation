@@ -1,5 +1,10 @@
 import os
 import sys
+
+# Workaround for AMD Radeon RX 6700 XT (gfx1031) on ROCm
+if not os.environ.get("HSA_OVERRIDE_GFX_VERSION"):
+    os.environ["HSA_OVERRIDE_GFX_VERSION"] = "10.3.0"
+
 import numpy as np
 import torch
 import torch.nn as nn
@@ -61,7 +66,7 @@ def train_model(epochs=20, batch_size=32, lr=1e-3, resume=False):
     # num_classes correspond au nombre maximum d'identifiants de TerrainType
     num_classes = max(t.value for t in TerrainType) + 1
     model = WorldModelAutoEncoder(num_rays=360, embed_dim=256, num_classes=num_classes, map_size=64).to(device)
-    
+
     # Pondération des classes pour pénaliser fortement (x10) les erreurs sur les obstacles fins
     class_weights = torch.ones(num_classes, dtype=torch.float32, device=device)
     hard_obstacles = [
@@ -70,12 +75,13 @@ def train_model(epochs=20, batch_size=32, lr=1e-3, resume=False):
         TerrainType.WALL.value, 
         TerrainType.FENCE.value
     ]
+    
     for obs_id in hard_obstacles:
         class_weights[obs_id] = 7.0
-        
+
     criterion = nn.CrossEntropyLoss(weight=class_weights)
     optimizer = optim.Adam(model.parameters(), lr=lr)
-    
+
     # Chargement du checkpoint si demandé
     checkpoint_path = "checkpoints/world_model.pth"
     if resume and os.path.exists(checkpoint_path):

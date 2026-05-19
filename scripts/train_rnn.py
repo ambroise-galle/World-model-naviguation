@@ -1,4 +1,13 @@
 import os
+import sys
+
+# Workaround for AMD Radeon RX 6700 XT (gfx1031) on ROCm
+if not os.environ.get("HSA_OVERRIDE_GFX_VERSION"):
+    os.environ["HSA_OVERRIDE_GFX_VERSION"] = "10.3.0"
+
+# Ajouter le dossier parent au path pour les imports locaux
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
 import torch
 import torch.optim as optim
 import numpy as np
@@ -14,36 +23,36 @@ class SequenceDataset(Dataset):
     """
     def __init__(self, sequences_path, seq_len=50):
         data = np.load(sequences_path, allow_pickle=True)
-        z_data = data['z']
-        a_data = data['actions']
+        self.z_data = data['z']
+        self.a_data = data['actions']
+        self.seq_len = seq_len
         
-        self.inputs_z = []
-        self.inputs_a = []
-        self.targets_z = []
+        self.valid_starts = []
         
-        print("Préparation du dataset (Sliding windows)...")
+        print("Préparation des indices du dataset (Sliding windows)...")
         # Fenêtre glissante de taille seq_len + 1
-        for ep_z, ep_a in zip(z_data, a_data):
+        for ep_idx, (ep_z, ep_a) in enumerate(zip(self.z_data, self.a_data)):
             ep_len = len(ep_z)
             if ep_len <= seq_len:
                 continue
             for i in range(ep_len - seq_len):
-                self.inputs_z.append(ep_z[i : i+seq_len])
-                self.inputs_a.append(ep_a[i : i+seq_len])
-                # La cible est z décalé d'un pas de temps dans le futur
-                self.targets_z.append(ep_z[i+1 : i+seq_len+1])
+                self.valid_starts.append((ep_idx, i))
                 
-        self.inputs_z = np.array(self.inputs_z, dtype=np.float32)
-        self.inputs_a = np.array(self.inputs_a, dtype=np.float32)
-        self.targets_z = np.array(self.targets_z, dtype=np.float32)
-        
-        print(f"Dataset prêt : {len(self.inputs_z)} séquences de taille {seq_len}.")
+        print(f"Dataset prêt : {len(self.valid_starts)} séquences de taille {seq_len}.")
 
     def __len__(self):
-        return len(self.inputs_z)
+        return len(self.valid_starts)
         
     def __getitem__(self, idx):
-        return self.inputs_z[idx], self.inputs_a[idx], self.targets_z[idx]
+        ep_idx, i = self.valid_starts[idx]
+        ep_z = self.z_data[ep_idx]
+        ep_a = self.a_data[ep_idx]
+        
+        input_z = ep_z[i : i+self.seq_len].astype(np.float32)
+        input_a = ep_a[i : i+self.seq_len].astype(np.float32)
+        target_z = ep_z[i+1 : i+self.seq_len+1].astype(np.float32)
+        
+        return input_z, input_a, target_z
 
 
 def train_rnn(epochs=20, batch_size=64, seq_len=50, lr=1e-3):

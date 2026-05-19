@@ -1,4 +1,13 @@
 import os
+import sys
+
+# Workaround for AMD Radeon RX 6700 XT (gfx1031) on ROCm
+if not os.environ.get("HSA_OVERRIDE_GFX_VERSION"):
+    os.environ["HSA_OVERRIDE_GFX_VERSION"] = "10.3.0"
+
+# Ajouter le dossier parent au path pour les imports locaux
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
 import torch
 import numpy as np
 import gymnasium as gym
@@ -14,6 +23,7 @@ try:
     from stable_baselines3 import PPO
     from stable_baselines3.common.env_checker import check_env
     from stable_baselines3.common.callbacks import CheckpointCallback
+    from stable_baselines3.common.vec_env import DummyVecEnv, VecNormalize
 except ImportError:
     print("Veuillez installer stable-baselines3 : pip3 install stable-baselines3")
     exit(1)
@@ -74,7 +84,7 @@ class WorldModelWrapper(gym.ObservationWrapper):
         # Concaténer [z, h, goal]
         return np.concatenate([z_t, h_t, goal]).astype(np.float32)
 
-def train_controller(timesteps=100_000):
+def train_controller(timesteps=300_000):
     device = torch.device("mps" if torch.backends.mps.is_available() else "cuda" if torch.cuda.is_available() else "cpu")
     print(f"Lancement de PPO sur l'appareil : {device}")
     
@@ -94,17 +104,33 @@ def train_controller(timesteps=100_000):
     m_model.eval()
     
     # Créer l'environnement
-    env = WorldModelEnv(render_mode=None)
-    env = WorldModelWrapper(env, v_model, m_model, device)
+    def make_env():
+        env = WorldModelEnv(render_mode=None)
+        return WorldModelWrapper(env, v_model, m_model, device)
+
+    # Vectorized + normalised observations (clips extreme z/h values, scales goal signal)
+    vec_env = DummyVecEnv([make_env])
+    vec_env = VecNormalize(vec_env, norm_obs=True, norm_reward=True, clip_obs=10.0)
     
-    # Vérification de l'environnement (Gymnasium)
-    check_env(env, warn=True)
+    # Vérification de l'environnement brut (Gymnasium)
+    check_env(make_env(), warn=True)
     
-    # PPO: Le "Controller" est en fait l'Actor-Critic de PPO (un petit MLP [64, 64])
-    policy_kwargs = dict(activation_fn=torch.nn.Tanh, net_arch=[64, 64])
+    # PPO: larger network to handle 514-dim latent input
+    # net_arch [256, 256] gives enough capacity; tanh keeps gradients stable
+    policy_kwargs = dict(activation_fn=torch.nn.Tanh, net_arch=[256, 256])
     
-    model = PPO("MlpPolicy", env, verbose=1, policy_kwargs=policy_kwargs, 
-                learning_rate=3e-4, batch_size=64, n_steps=2048)
+    model = PPO(
+        "MlpPolicy",
+        vec_env,
+        verbose=1,
+        policy_kwargs=policy_kwargs,
+        learning_rate=3e-4,
+        batch_size=256,
+        n_steps=2048,
+        ent_coef=0.01,          # encourage exploration
+        clip_range=0.2,
+        gamma=0.99,
+    )
                 
     # Sauvegarde automatique
     os.makedirs("checkpoints/ppo", exist_ok=True)
@@ -114,6 +140,8 @@ def train_controller(timesteps=100_000):
     model.learn(total_timesteps=timesteps, callback=checkpoint_callback)
     
     model.save("checkpoints/controller_ppo.zip")
+    # Save normalisation stats so play_agent can reuse them
+    vec_env.save("checkpoints/vec_normalize.pkl")
     print("Entraînement PPO terminé ! Modèle sauvegardé dans checkpoints/controller_ppo.zip")
 
 if __name__ == "__main__":
